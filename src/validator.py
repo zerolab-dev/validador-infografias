@@ -96,7 +96,8 @@ def validate_infographic(pdf_data: dict, expected_data: dict) -> dict:
         if not matched: continue
         exp = expected_data[key][matched]
         got = pdf_data.get("historicos", {}).get(key, {})
-        for period_key in ("Ene-Set 2025", "Ene-Set 2024"):
+        period_prefix = f"Ene-{expected_data.get('_meta', {}).get('abbr', 'Set')}"
+        for period_key in (f"{period_prefix} 2025", f"{period_prefix} 2024"):
             ev, pv = exp.get(period_key), got.get(period_key)
             if ev is None and pv is None:
                 state, obs = "COINCIDE", "Sin valor histórico."

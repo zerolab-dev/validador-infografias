@@ -83,8 +83,8 @@ def _source_and_period(text: str):
 
 def _timeline(text: str):
     """Captura la secuencia visual de totales y comparativos, incluyendo '--'."""
-    matches = re.findall(r"(?m)^\s*(--|[0-9][0-9,.]*)\s*\n\s*Ene\s*-?\s*Set\s*(\d{3,4})\s*$", text, flags=re.I)
-    return [(normalize_number(v), y) for v, y in matches]
+    matches = re.findall(r"(?m)^\s*(--|[0-9][0-9,.]*)\s*\n\s*Ene\s*-?\s*(Ene|Feb|Mar|Abr|May|Jun|Jul|Ago|Set|Sep|Oct|Nov|Dic)\s*(\d{3,4})\s*$", text, flags=re.I)
+    return [(normalize_number(v), abbr.title(), y) for v, abbr, y in matches]
 
 def extract_pdf_data(pdf_file) -> dict:
     filename = getattr(pdf_file, "name", None) or (str(pdf_file).split("/")[-1] if isinstance(pdf_file, str) else "desconocido.pdf")
@@ -116,31 +116,31 @@ def extract_pdf_data(pdf_file) -> dict:
             # Maqueta nacional: clientes 2026, articulaciones 2026, clientes 2025/2024, servicios 2026/2025/2024.
             if len(timeline) >= 1: result["clientes"]["Total"] = timeline[0][0]
             if len(timeline) >= 2: result["articulaciones"]["Total"] = timeline[1][0]
-            if len(timeline) >= 3: result["historicos"]["clientes"]["Ene-Set 2025"] = timeline[2][0]
-            if len(timeline) >= 4: result["historicos"]["clientes"]["Ene-Set 2024"] = timeline[3][0]
+            if len(timeline) >= 3: result["historicos"]["clientes"][f"Ene-{timeline[2][1]} 2025"] = timeline[2][0]
+            if len(timeline) >= 4: result["historicos"]["clientes"][f"Ene-{timeline[3][1]} 2024"] = timeline[3][0]
             if len(timeline) >= 5: result["servicios"]["Total"] = timeline[4][0]
-            if len(timeline) >= 6: result["historicos"]["servicios"]["Ene-Set 2025"] = timeline[5][0]
-            if len(timeline) >= 7: result["historicos"]["servicios"]["Ene-Set 2024"] = timeline[6][0]
+            if len(timeline) >= 6: result["historicos"]["servicios"][f"Ene-{timeline[5][1]} 2025"] = timeline[5][0]
+            if len(timeline) >= 7: result["historicos"]["servicios"][f"Ene-{timeline[6][1]} 2024"] = timeline[6][0]
         else:
             # CITE/UT: dentro de cada año, los dos primeros valores son Clientes y Servicios; un tercer 2026 es Articulaciones.
             by_year = {}
-            for value, year in timeline:
-                by_year.setdefault(year, []).append(value)
+            for value, _abbr, year in timeline:
+                by_year.setdefault(year, []).append((value, _abbr))
             y26 = by_year.get("2026", [])
             y25 = by_year.get("2025", [])
             y24 = by_year.get("2024", [])
             y204 = by_year.get("204", [])  # tolera el typo editorial "Ene-Set 204" para no perder el valor
-            if len(y26) >= 1: result["clientes"]["Total"] = y26[0]
-            if len(y26) >= 2: result["servicios"]["Total"] = y26[1]
-            if len(y26) >= 3: result["articulaciones"]["Total"] = y26[2]
-            if len(y25) >= 1: result["historicos"]["clientes"]["Ene-Set 2025"] = y25[0]
-            if len(y25) >= 2: result["historicos"]["servicios"]["Ene-Set 2025"] = y25[1]
+            if len(y26) >= 1: result["clientes"]["Total"] = y26[0][0]
+            if len(y26) >= 2: result["servicios"]["Total"] = y26[1][0]
+            if len(y26) >= 3: result["articulaciones"]["Total"] = y26[2][0]
+            if len(y25) >= 1: result["historicos"]["clientes"][f"Ene-{y25[0][1]} 2025"] = y25[0][0]
+            if len(y25) >= 2: result["historicos"]["servicios"][f"Ene-{y25[1][1]} 2025"] = y25[1][0]
             if y204:
-                result["historicos"]["clientes"]["Ene-Set 2024"] = y204[0]
-                if len(y24) >= 1: result["historicos"]["servicios"]["Ene-Set 2024"] = y24[0]
+                result["historicos"]["clientes"][f"Ene-{y204[0][1]} 2024"] = y204[0][0]
+                if len(y24) >= 1: result["historicos"]["servicios"][f"Ene-{y24[0][1]} 2024"] = y24[0][0]
             else:
-                if len(y24) >= 1: result["historicos"]["clientes"]["Ene-Set 2024"] = y24[0]
-                if len(y24) >= 2: result["historicos"]["servicios"]["Ene-Set 2024"] = y24[1]
+                if len(y24) >= 1: result["historicos"]["clientes"][f"Ene-{y24[0][1]} 2024"] = y24[0][0]
+                if len(y24) >= 2: result["historicos"]["servicios"][f"Ene-{y24[1][1]} 2024"] = y24[1][0]
 
 
         # Si el bloque de articulaciones no aparece, se deja vacío: no se inventan ceros.

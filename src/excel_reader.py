@@ -55,14 +55,15 @@ def load_excel_data(excel_file) -> dict:
     return {k.lower(): pd.read_excel(xls, sheet_name=found[k], header=None) for k in required}
 
 
-def _build_block(df: pd.DataFrame, categories: list[str], historical: bool) -> dict:
+def _build_block(df: pd.DataFrame, categories: list[str], historical: bool, period_meta: dict | None = None) -> dict:
     out = {}
     # Nacional: categorías en fila 2 (índice 2); desde columna 3 para clientes/servicios y 1 para articulaciones.
     start = 3 if historical else 1
     national = {cat: normalize_number(df.iloc[2, start+i]) for i, cat in enumerate(categories)}
     if historical:
-        national["Ene-Set 2024"] = normalize_number(df.iloc[2, 1])
-        national["Ene-Set 2025"] = normalize_number(df.iloc[2, 2])
+        prefix = f"Ene-{period_meta['abbr']}" if period_meta else "Ene-Set"
+        national[f"{prefix} 2024"] = normalize_number(df.iloc[2, 1])
+        national[f"{prefix} 2025"] = normalize_number(df.iloc[2, 2])
     out["NACIONAL"] = national
 
     # Detalle CITE/UT empieza en fila 6 (índice 6).
@@ -73,8 +74,9 @@ def _build_block(df: pd.DataFrame, categories: list[str], historical: bool) -> d
         name = normalize_cite_name(raw_name)
         vals = {cat: normalize_number(df.iloc[r, start+i]) for i, cat in enumerate(categories)}
         if historical:
-            vals["Ene-Set 2024"] = normalize_number(df.iloc[r, 1])
-            vals["Ene-Set 2025"] = normalize_number(df.iloc[r, 2])
+            prefix = f"Ene-{period_meta['abbr']}" if period_meta else "Ene-Set"
+            vals[f"{prefix} 2024"] = normalize_number(df.iloc[r, 1])
+            vals[f"{prefix} 2025"] = normalize_number(df.iloc[r, 2])
         out[name] = vals
     return out
 
@@ -83,7 +85,7 @@ def extract_expected_values(excel_data: dict) -> dict:
     period_meta = detect_reporting_period(excel_data)
     return {
         "_meta": period_meta,
-        "clientes": _build_block(excel_data["clientes"], CLIENTES_CATEGORIES, True),
-        "servicios": _build_block(excel_data["servicios"], SERVICIOS_CATEGORIES, True),
+        "clientes": _build_block(excel_data["clientes"], CLIENTES_CATEGORIES, True, period_meta),
+        "servicios": _build_block(excel_data["servicios"], SERVICIOS_CATEGORIES, True, period_meta),
         "articulaciones": _build_block(excel_data["articulaciones"], ARTICULACIONES_CATEGORIES, False),
     }
