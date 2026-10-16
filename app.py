@@ -24,18 +24,19 @@ if validar:
         try:
             with st.spinner("Extrayendo y contrastando información..."):
                 expected=extract_expected_values(load_excel_data(excel_file))
+                expected_period=expected["_meta"]["expected_period"]
                 reconstructed=[]; comparisons=[]; issues=[]
                 for f in pdf_files:
                     d=extract_pdf_data(f); reconstructed.append(d)
                     v=validate_infographic(d,expected); comparisons.extend(v["comparisons"]); issues.extend(v["issues"])
-                st.session_state.validation={"reconstructed":reconstructed,"comparisons":comparisons,"issues":issues}
+                st.session_state.validation={"reconstructed":reconstructed,"comparisons":comparisons,"issues":issues,"expected_period":expected_period}
             st.success("Validación completada.")
         except Exception as e:
             st.exception(e)
 
 r=st.session_state.validation
 if r:
-    comp=pd.DataFrame(r["comparisons"]); issues=pd.DataFrame(r["issues"]); rec=r["reconstructed"]
+    comp=pd.DataFrame(r["comparisons"]); issues=pd.DataFrame(r["issues"]); rec=r["reconstructed"]; expected_period=r.get("expected_period", "")
     errors=int((comp["estado"]=="ERROR").sum()) if not comp.empty else 0
     reviews=int((comp["estado"]=="REVISAR").sum()) if not comp.empty else 0
     matches=int((comp["estado"]=="COINCIDE").sum()) if not comp.empty else 0
@@ -52,7 +53,7 @@ if r:
             cc=comp[comp["cite"]==cite] if not comp.empty else pd.DataFrame()
             err=int((cc["estado"]=="ERROR").sum()) if not cc.empty else 0
             rev=int((cc["estado"]=="REVISAR").sum()) if not cc.empty else 0
-            rows.append({"Archivo":p["filename"],"CITE/UT":cite,"Errores":err,"Revisar":rev,"Observaciones":len(ci),"Fuente":"OK" if p["periodo_encontrado"]=="Enero - Setiembre 2026" else "ERROR","Estado":"CORRECTO" if err==0 and rev==0 and len(ci)==0 else "OBSERVADO"})
+            rows.append({"Archivo":p["filename"],"CITE/UT":cite,"Errores":err,"Revisar":rev,"Observaciones":len(ci),"Fuente":"OK" if p["periodo_encontrado"]==expected_period else "ERROR","Estado":"CORRECTO" if err==0 and rev==0 and len(ci)==0 else "OBSERVADO"})
         st.dataframe(pd.DataFrame(rows),use_container_width=True,hide_index=True)
     with t2:
         show_all=st.checkbox("Mostrar coincidencias",False)
