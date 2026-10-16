@@ -1,5 +1,5 @@
 import re
-from config.categorias import CLIENTES_CATEGORIES, SERVICIOS_CATEGORIES, ARTICULACIONES_CATEGORIES, EXPECTED_PERIOD
+from config.categorias import CLIENTES_CATEGORIES, SERVICIOS_CATEGORIES, ARTICULACIONES_CATEGORIES
 from src.normalizer import cite_key, normalize_text
 
 
@@ -56,13 +56,16 @@ def validate_infographic(pdf_data: dict, expected_data: dict) -> dict:
             issues.append({"cite": cite, "tipo": "ERROR DE EXTRACCIÓN", "bloque": "PDF", "elemento": "Archivo", "descripcion": err})
 
     period = pdf_data.get("periodo_encontrado", "NO EXTRAÍDO")
-    if period != EXPECTED_PERIOD:
-        issues.append({"cite": cite, "tipo": "ERROR DE PERÍODO" if period != "NO EXTRAÍDO" else "REVISAR FUENTE", "bloque": "Fuente", "elemento": "Periodo", "descripcion": f"Esperado: {EXPECTED_PERIOD}. Encontrado: {period}."})
+    expected_period = expected_data.get("_meta", {}).get("expected_period")
+    if not expected_period:
+        raise ValueError("El Excel de referencia no contiene un período de corte detectable.")
+    if period != expected_period:
+        issues.append({"cite": cite, "tipo": "ERROR DE PERÍODO" if period != "NO EXTRAÍDO" else "REVISAR FUENTE", "bloque": "Fuente", "elemento": "Periodo", "descripcion": f"Esperado: {expected_period}. Encontrado: {period}."})
 
     raw_norm = normalize_text(pdf_data.get("raw_text", ""))
     # Detecta referencias a meses anteriores dentro de notas de no atención; no marca menciones históricas normales.
     if re.search(r"no ha brindado servicios.{0,80}(julio|agosto) 2026", raw_norm):
-        issues.append({"cite": cite, "tipo": "REVISAR TEXTO / POSIBLE TEXTO DESACTUALIZADO", "bloque": "Texto", "elemento": "Referencia temporal", "descripcion": "Se detectó una nota de no atención referida a un mes anterior al corte de Setiembre 2026."})
+        issues.append({"cite": cite, "tipo": "REVISAR TEXTO / POSIBLE TEXTO DESACTUALIZADO", "bloque": "Texto", "elemento": "Referencia temporal", "descripcion": f"Se detectó una nota de no atención referida a un mes anterior al corte de {expected_data.get('_meta', {}).get('month', 'reporte')} {expected_data.get('_meta', {}).get('year', '')}."})
     if re.search(r"ene\s*-?\s*set\s*204(?!\d)", raw_norm):
         issues.append({"cite": cite, "tipo": "ERROR DE TEXTO", "bloque": "Texto", "elemento": "Año comparativo", "descripcion": "Se detectó 'Ene-Set 204'; revisar porque probablemente corresponde a 'Ene-Set 2024'."})
 
@@ -107,4 +110,4 @@ def validate_infographic(pdf_data: dict, expected_data: dict) -> dict:
             if state != "COINCIDE":
                 issues.append({"cite": cite, "tipo": "ERROR HISTÓRICO" if state == "ERROR" else "REVISAR EXTRACCIÓN", "bloque": label, "elemento": period_key, "descripcion": obs})
 
-    return {"cite": cite, "comparisons": comparisons, "issues": issues, "periodo_valido": period == EXPECTED_PERIOD}
+    return {"cite": cite, "comparisons": comparisons, "issues": issues, "periodo_valido": period == expected_period}

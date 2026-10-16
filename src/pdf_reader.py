@@ -52,19 +52,33 @@ def _extract_category(text: str, category: str):
 def _source_and_period(text: str):
     source = "NO EXTRAÍDO"
     for line in [x.strip() for x in text.splitlines() if x.strip()]:
-        if "registro administrativo cite" in normalize_text(line) or "registros administrativos cite" in normalize_text(line):
+        nline = normalize_text(line)
+        if "registro administrativo cite" in nline or "registros administrativos cite" in nline:
             source = line
             break
-    n = normalize_text(source)
     if source == "NO EXTRAÍDO":
-        period = "NO EXTRAÍDO"
-    elif "enero" in n and ("setiembre" in n or "septiembre" in n) and "2026" in n:
-        period = "Enero - Setiembre 2026"
-    elif ("setiembre" in n or "septiembre" in n) and "2026" in n:
-        period = "Setiembre 2026"
-    else:
-        period = source
-    return source, period
+        return source, "NO EXTRAÍDO"
+
+    n = normalize_text(source)
+    months = [
+        ("enero", "Enero"), ("febrero", "Febrero"), ("marzo", "Marzo"),
+        ("abril", "Abril"), ("mayo", "Mayo"), ("junio", "Junio"),
+        ("julio", "Julio"), ("agosto", "Agosto"),
+        ("setiembre", "Setiembre"), ("septiembre", "Setiembre"),
+        ("octubre", "Octubre"), ("noviembre", "Noviembre"), ("diciembre", "Diciembre"),
+    ]
+    year_match = re.search(r"20\d{2}", n)
+    year = year_match.group(0) if year_match else None
+    found = [(token, label) for token, label in months if token in n]
+    if year and "enero" in n:
+        # El último mes mencionado en la fuente es el corte acumulado.
+        order = [x[0] for x in months]
+        end = max(found, key=lambda x: order.index(x[0]))[1] if found else None
+        if end:
+            return source, f"Enero - {end} {year}"
+    if year and found:
+        return source, f"{found[-1][1]} {year}"
+    return source, source
 
 
 def _timeline(text: str):

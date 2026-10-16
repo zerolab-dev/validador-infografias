@@ -27,8 +27,8 @@ def cite_name_from_filename(filename: str) -> str:
     stem = Path(filename).stem
     if normalize_text(stem).startswith("infografia pp0093"):
         return "NACIONAL"
-    stem = re.sub(r"[_\- ]*setiembre[_\- ]*2026.*$", "", stem, flags=re.I)
-    stem = re.sub(r"[_\- ]*septiembre[_\- ]*2026.*$", "", stem, flags=re.I)
+    month = r"(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|setiembre|septiembre|octubre|noviembre|diciembre)"
+    stem = re.sub(rf"[_\- ]*{month}[_\- ]*20\d{{2}}.*$", "", stem, flags=re.I)
     return normalize_cite_name(stem)
 
 

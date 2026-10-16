@@ -1,6 +1,48 @@
 import pandas as pd
 from src.normalizer import normalize_cite_name, normalize_number
 from config.categorias import CLIENTES_CATEGORIES, SERVICIOS_CATEGORIES, ARTICULACIONES_CATEGORIES
+import re
+import unicodedata
+
+
+MONTH_MAP = {
+    "ene": "Enero", "enero": "Enero",
+    "feb": "Febrero", "febrero": "Febrero",
+    "mar": "Marzo", "marzo": "Marzo",
+    "abr": "Abril", "abril": "Abril",
+    "may": "Mayo", "mayo": "Mayo",
+    "jun": "Junio", "junio": "Junio",
+    "jul": "Julio", "julio": "Julio",
+    "ago": "Agosto", "agosto": "Agosto",
+    "set": "Setiembre", "sep": "Setiembre", "setiembre": "Setiembre", "septiembre": "Setiembre",
+    "oct": "Octubre", "octubre": "Octubre",
+    "nov": "Noviembre", "noviembre": "Noviembre",
+    "dic": "Diciembre", "diciembre": "Diciembre",
+}
+
+def _plain(value):
+    text = str(value or "")
+    text = unicodedata.normalize("NFKD", text)
+    return "".join(c for c in text if not unicodedata.combining(c)).lower()
+
+def detect_reporting_period(excel_data: dict) -> dict:
+    """Detecta el corte directamente de los encabezados del Excel oficial."""
+    candidates = []
+    for df in excel_data.values():
+        for value in df.iloc[:8, :8].to_numpy().ravel():
+            if pd.isna(value):
+                continue
+            text = _plain(value)
+            m = re.search(r"ene(?:ro)?\s*[-–—]\s*(ene|feb|mar|abr|may|jun|jul|ago|set|sep|oct|nov|dic|enero|febrero|marzo|abril|mayo|junio|julio|agosto|setiembre|septiembre|octubre|noviembre|diciembre)\s*(20\d{2})", text, re.I)
+            if m:
+                candidates.append((m.group(1).lower(), int(m.group(2))))
+    if not candidates:
+        raise ValueError("No se pudo detectar el período de corte en los encabezados del Excel de referencia.")
+    # El encabezado contiene comparativos 2024/2025 y el corte vigente 2026; usamos el año más reciente.
+    month_token, year = max(candidates, key=lambda x: x[1])
+    month_name = MONTH_MAP[month_token]
+    abbr = {"Enero":"Ene","Febrero":"Feb","Marzo":"Mar","Abril":"Abr","Mayo":"May","Junio":"Jun","Julio":"Jul","Agosto":"Ago","Setiembre":"Set","Octubre":"Oct","Noviembre":"Nov","Diciembre":"Dic"}[month_name]
+    return {"month": month_name, "abbr": abbr, "year": year, "expected_period": f"Enero - {month_name} {year}"}
 
 
 def load_excel_data(excel_file) -> dict:
@@ -38,7 +80,9 @@ def _build_block(df: pd.DataFrame, categories: list[str], historical: bool) -> d
 
 
 def extract_expected_values(excel_data: dict) -> dict:
+    period_meta = detect_reporting_period(excel_data)
     return {
+        "_meta": period_meta,
         "clientes": _build_block(excel_data["clientes"], CLIENTES_CATEGORIES, True),
         "servicios": _build_block(excel_data["servicios"], SERVICIOS_CATEGORIES, True),
         "articulaciones": _build_block(excel_data["articulaciones"], ARTICULACIONES_CATEGORIES, False),
